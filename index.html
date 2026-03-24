@@ -3,975 +3,270 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GivingTuesday Meme Generator</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --gt-red: #E63946;
-    --gt-dark: #1a1a2e;
-    --gt-mid: #16213e;
-    --gt-accent: #FFD60A;
-    --gt-teal: #06D6A0;
-    --gt-white: #FAFAFA;
-    --gt-muted: #8892a4;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Nunito', sans-serif;
-    background: var(--gt-dark);
-    color: var(--gt-white);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Animated background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(230,57,70,0.15) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 60% at 80% 80%, rgba(6,214,160,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(255,214,10,0.05) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Confetti dots */
-  .bg-dots {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-  .dot {
-    position: absolute;
-    border-radius: 50%;
-    opacity: 0.15;
-    animation: floatDot linear infinite;
-  }
-
-  @keyframes floatDot {
-    0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
-    10% { opacity: 0.2; }
-    90% { opacity: 0.15; }
-    100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
-  }
-
-  header {
-    position: relative;
-    z-index: 10;
-    text-align: center;
-    padding: 48px 24px 32px;
-  }
-
-  .logo-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--gt-red);
-    color: white;
-    padding: 8px 20px 8px 12px;
-    border-radius: 100px;
-    margin-bottom: 20px;
-    font-weight: 900;
-    font-size: 13px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    box-shadow: 0 4px 20px rgba(230,57,70,0.4);
-  }
-
-  .logo-badge span.heart {
-    font-size: 18px;
-  }
-
-  h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(48px, 8vw, 96px);
-    line-height: 0.95;
-    letter-spacing: 2px;
-    background: linear-gradient(135deg, #fff 0%, #FFD60A 50%, #E63946 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 12px;
-  }
-
-  .subtitle {
-    color: var(--gt-muted);
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-  }
-
-  /* Main layout */
-  .main {
-    position: relative;
-    z-index: 10;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 24px 80px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-    align-items: start;
-  }
-
-  @media (max-width: 768px) {
-    .main { grid-template-columns: 1fr; }
-  }
-
-  /* Panel */
-  .panel {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    padding: 28px;
-    backdrop-filter: blur(10px);
-  }
-
-  .panel-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    letter-spacing: 2px;
-    color: var(--gt-accent);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Upload area */
-  .upload-area {
-    border: 2px dashed rgba(255,255,255,0.2);
-    border-radius: 16px;
-    padding: 40px 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    background: rgba(255,255,255,0.02);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .upload-area:hover, .upload-area.dragover {
-    border-color: var(--gt-red);
-    background: rgba(230,57,70,0.08);
-  }
-
-  .upload-area input[type="file"] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  .upload-icon {
-    font-size: 40px;
-    margin-bottom: 12px;
-  }
-
-  .upload-text {
-    font-weight: 700;
-    color: var(--gt-white);
-    margin-bottom: 4px;
-  }
-
-  .upload-sub {
-    font-size: 13px;
-    color: var(--gt-muted);
-  }
-
-  /* Template grid */
-  .template-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 16px;
-  }
-
-  .template-thumb {
-    aspect-ratio: 1;
-    border-radius: 10px;
-    overflow: hidden;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.2s;
-    background: rgba(255,255,255,0.05);
-    position: relative;
-  }
-
-  .template-thumb:hover {
-    border-color: var(--gt-teal);
-    transform: scale(1.04);
-  }
-
-  .template-thumb.active {
-    border-color: var(--gt-red);
-    box-shadow: 0 0 16px rgba(230,57,70,0.4);
-  }
-
-  .template-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .template-thumb .template-label {
-    position: absolute;
-    bottom: 0;
-    left: 0; right: 0;
-    background: linear-gradient(transparent, rgba(0,0,0,0.8));
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 12px 6px 5px;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  /* Controls */
-  label {
-    display: block;
-    font-size: 12px;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--gt-muted);
-    margin-bottom: 6px;
-    margin-top: 16px;
-  }
-
-  input[type="text"], textarea, select {
-    width: 100%;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
-    color: white;
-    font-family: 'Nunito', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    padding: 12px 14px;
-    outline: none;
-    transition: border-color 0.2s;
-    resize: vertical;
-  }
-
-  input[type="text"]:focus, textarea:focus, select:focus {
-    border-color: var(--gt-red);
-    background: rgba(230,57,70,0.08);
-  }
-
-  textarea { min-height: 68px; }
-
-  /* Font size / style row */
-  .row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-  }
-
-  .color-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 6px;
-  }
-
-  .color-swatch {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: transform 0.15s, border-color 0.15s;
-  }
-
-  .color-swatch:hover { transform: scale(1.15); }
-  .color-swatch.active { border-color: white; transform: scale(1.15); }
-
-  input[type="color"] {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 0;
-  }
-
-  input[type="range"] {
-    width: 100%;
-    accent-color: var(--gt-red);
-    margin-top: 6px;
-  }
-
-  /* Overlay selector */
-  .overlay-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-top: 6px;
-  }
-
-  .overlay-opt {
-    padding: 8px 4px;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-    border: 1.5px solid rgba(255,255,255,0.1);
-    transition: all 0.2s;
-    background: rgba(255,255,255,0.04);
-  }
-
-  .overlay-opt:hover { border-color: var(--gt-teal); }
-  .overlay-opt.active { border-color: var(--gt-red); background: rgba(230,57,70,0.15); color: var(--gt-red); }
-
-  /* Canvas preview */
-  .preview-panel {
-    position: sticky;
-    top: 24px;
-  }
-
-  .canvas-wrap {
-    position: relative;
-    border-radius: 16px;
-    overflow: hidden;
-    background: #111;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
-  }
-
-  canvas {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  /* Buttons */
-  .btn-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 20px;
-  }
-
-  .btn {
-    flex: 1;
-    padding: 14px 20px;
-    border-radius: 12px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 900;
-    font-size: 14px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-  }
-
-  .btn-primary {
-    background: var(--gt-red);
-    color: white;
-    box-shadow: 0 4px 20px rgba(230,57,70,0.4);
-  }
-
-  .btn-primary:hover {
-    background: #ff4757;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 30px rgba(230,57,70,0.5);
-  }
-
-  .btn-secondary {
-    background: rgba(255,255,255,0.08);
-    color: white;
-    border: 1px solid rgba(255,255,255,0.15);
-  }
-
-  .btn-secondary:hover {
-    background: rgba(255,255,255,0.14);
-    transform: translateY(-1px);
-  }
-
-  .btn-share {
-    background: var(--gt-teal);
-    color: var(--gt-dark);
-    box-shadow: 0 4px 20px rgba(6,214,160,0.3);
-  }
-
-  .btn-share:hover {
-    background: #09f0b5;
-    transform: translateY(-1px);
-  }
-
-  /* Share icons row */
-  .share-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .share-btn {
-    flex: 1;
-    padding: 10px;
-    border-radius: 10px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 900;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    cursor: pointer;
-    border: 1.5px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.06);
-    color: white;
-    transition: all 0.2s;
-    text-align: center;
-  }
-
-  .share-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
-
-  .share-btn.twitter { border-color: #1da1f2; color: #1da1f2; }
-  .share-btn.facebook { border-color: #4267B2; color: #84a8e8; }
-  .share-btn.instagram { border-color: #e1306c; color: #e1306c; }
-
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--gt-teal);
-    color: var(--gt-dark);
-    font-weight: 900;
-    font-size: 14px;
-    padding: 12px 24px;
-    border-radius: 100px;
-    z-index: 100;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    pointer-events: none;
-  }
-
-  .toast.show { transform: translateX(-50%) translateY(0); }
-
-  /* Section divider */
-  .divider {
-    height: 1px;
-    background: rgba(255,255,255,0.07);
-    margin: 20px 0;
-  }
-</style>
+<title>GivingTuesday Meme Lab 💀❤️</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div class="bg-dots" id="bgDots"></div>
-
-<header>
-  <div class="logo-badge">
-    <span class="heart">❤️</span> GivingTuesday
+<!-- ░░ HEADER ░░ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-heart">❤️</span>
+      <span class="logo-text">GivingTuesday <em>Meme Lab</em></span>
+      <span class="logo-tag">est. because someone had to</span>
+    </div>
+    <nav class="header-nav">
+      <button class="nav-btn active" data-page="create">✏️ Create</button>
+      <button class="nav-btn" data-page="gallery">🖼️ Gallery</button>
+      <button class="nav-btn" data-page="leaderboard">🏆 Board</button>
+    </nav>
+    <div class="auth-zone">
+      <div id="authSignedOut" class="auth-signed-out">
+        <button class="btn-ghost" id="loginBtn">Log in</button>
+        <button class="btn-red" id="signupBtn">Join free</button>
+      </div>
+      <div id="authSignedIn" class="auth-signed-in hidden">
+        <span class="user-avatar" id="userAvatar">?</span>
+        <span class="user-name" id="userName"></span>
+        <button class="btn-ghost" id="logoutBtn">Out</button>
+      </div>
+    </div>
   </div>
-  <h1>MEME<br>GENERATOR</h1>
-  <p class="subtitle">Spread generosity. Make it viral. 🌍</p>
 </header>
 
-<div class="main">
-  <!-- Left panel: controls -->
-  <div>
-    <!-- Image source -->
-    <div class="panel">
-      <div class="panel-title">📸 Image</div>
-
-      <div class="upload-area" id="uploadArea">
-        <input type="file" id="imgInput" accept="image/*">
-        <div class="upload-icon">🖼️</div>
-        <div class="upload-text">Drop an image or click to upload</div>
-        <div class="upload-sub">PNG, JPG, GIF supported</div>
-      </div>
-
-      <div style="margin-top:16px;">
-        <div class="panel-title" style="font-size:15px; margin-bottom:10px;">✨ Templates</div>
-        <div class="template-grid" id="templateGrid"></div>
-      </div>
-    </div>
-
-    <!-- Text controls -->
-    <div class="panel" style="margin-top:20px;">
-      <div class="panel-title">✍️ Text</div>
-
-      <label>Top Text</label>
-      <input type="text" id="topText" placeholder="WHEN YOU DONATE ON #GIVINGTUESDAY" value="WHEN YOU DONATE ON #GIVINGTUESDAY">
-
-      <label>Bottom Text</label>
-      <input type="text" id="bottomText" placeholder="AND CHANGE THE WORLD FOR $5" value="AND CHANGE THE WORLD FOR $5">
-
-      <div class="divider"></div>
-
-      <div class="row">
-        <div>
-          <label>Font Size</label>
-          <input type="range" id="fontSize" min="20" max="90" value="42">
-        </div>
-        <div>
-          <label>Style</label>
-          <select id="fontStyle">
-            <option value="Impact">Impact</option>
-            <option value="'Bebas Neue'" selected>Bebas Neue</option>
-            <option value="Arial Black">Arial Black</option>
-            <option value="Comic Sans MS">Comic Sans</option>
-          </select>
-        </div>
-        <div>
-          <label>Outline</label>
-          <input type="range" id="outlineWidth" min="0" max="10" value="4">
-        </div>
-      </div>
-
-      <label>Text Color</label>
-      <div class="color-row">
-        <div class="color-swatch active" data-color="#ffffff" style="background:#ffffff;" title="White"></div>
-        <div class="color-swatch" data-color="#FFD60A" style="background:#FFD60A;" title="Yellow"></div>
-        <div class="color-swatch" data-color="#E63946" style="background:#E63946;" title="Red"></div>
-        <div class="color-swatch" data-color="#06D6A0" style="background:#06D6A0;" title="Teal"></div>
-        <div class="color-swatch" data-color="#1a1a2e" style="background:#1a1a2e; border: 1px solid #444;" title="Dark"></div>
-        <input type="color" id="customColor" value="#ffffff" title="Custom color">
-      </div>
-
-      <label>Outline Color</label>
-      <div class="color-row">
-        <div class="color-swatch active" data-outline="#000000" style="background:#000000; border:2px solid rgba(255,255,255,0.3);" title="Black"></div>
-        <div class="color-swatch" data-outline="#E63946" style="background:#E63946;" title="Red"></div>
-        <div class="color-swatch" data-outline="#1a1a2e" style="background:#1a1a2e; border: 1px solid #444;" title="Dark"></div>
-        <div class="color-swatch" data-outline="#ffffff" style="background:#ffffff;" title="White"></div>
-      </div>
-    </div>
-
-    <!-- Overlay / branding -->
-    <div class="panel" style="margin-top:20px;">
-      <div class="panel-title">🏷️ Overlay & Branding</div>
-
-      <label>GivingTuesday Overlay</label>
-      <div class="overlay-grid">
-        <div class="overlay-opt active" data-overlay="none">None</div>
-        <div class="overlay-opt" data-overlay="badge">Badge</div>
-        <div class="overlay-opt" data-overlay="banner">Banner</div>
-        <div class="overlay-opt" data-overlay="corner">Corner</div>
-      </div>
-
-      <label style="margin-top:16px;">Hashtag Tag</label>
-      <input type="text" id="hashtagText" value="#GivingTuesday" placeholder="#GivingTuesday">
-    </div>
-  </div>
-
-  <!-- Right panel: canvas preview -->
-  <div class="preview-panel">
-    <div class="panel">
-      <div class="panel-title">🖥️ Preview</div>
-      <div class="canvas-wrap">
-        <canvas id="memeCanvas" width="600" height="600"></canvas>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="downloadBtn">⬇ Download</button>
-        <button class="btn btn-secondary" id="copyBtn">📋 Copy</button>
-      </div>
-      <div class="share-row">
-        <button class="btn share-btn twitter" id="twitterBtn">𝕏 Twitter</button>
-        <button class="btn share-btn facebook" id="facebookBtn">f Facebook</button>
-        <button class="btn share-btn instagram" id="igBtn">📸 Instagram</button>
-      </div>
-    </div>
+<!-- ░░ TAGLINE TICKER ░░ -->
+<div class="ticker-wrap">
+  <div class="ticker">
+    <span>Save the world one meme at a time 🌍</span>
+    <span>Tax-deductible content 📝</span>
+    <span>More effective than a newsletter nobody reads 📧</span>
+    <span>Your nonprofit needs this. Trust. ✨</span>
+    <span>Making generosity go viral since right now 🚀</span>
+    <span>The ROI on love is immeasurable 💸</span>
+    <span>Your donors are on the internet. Just saying. 👀</span>
+    <span>Save the world one meme at a time 🌍</span>
+    <span>Tax-deductible content 📝</span>
+    <span>More effective than a newsletter nobody reads 📧</span>
   </div>
 </div>
 
-<div class="toast" id="toast">✅ Copied to clipboard!</div>
+<!-- ░░ PAGES ░░ -->
+<main>
 
-<script>
-// ─── State ───────────────────────────────────────────────────────────────────
-const state = {
-  image: null,
-  topText: "WHEN YOU DONATE ON #GIVINGTUESDAY",
-  bottomText: "AND CHANGE THE WORLD FOR $5",
-  fontSize: 42,
-  fontStyle: "'Bebas Neue'",
-  outlineWidth: 4,
-  textColor: "#ffffff",
-  outlineColor: "#000000",
-  overlay: "none",
-  hashtag: "#GivingTuesday",
-};
+  <!-- CREATE PAGE -->
+  <div id="page-create" class="page active">
+    <div class="create-layout">
 
-// ─── Canvas ───────────────────────────────────────────────────────────────────
-const canvas = document.getElementById("memeCanvas");
-const ctx = canvas.getContext("2d");
+      <!-- LEFT: Controls -->
+      <div class="controls-col">
 
-function drawMeme() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+        <!-- Image Source -->
+        <section class="ctrl-section">
+          <h2 class="section-head">📸 Image Source</h2>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="imgInput" accept="image/*">
+            <div class="upload-inner">
+              <div class="upload-icon-big">🖼️</div>
+              <p class="upload-primary">Drop it like it's hot</p>
+              <p class="upload-secondary">or click to browse · PNG, JPG, GIF</p>
+            </div>
+          </div>
+          <div class="template-shelf" id="templateShelf"></div>
+        </section>
 
-  if (state.image) {
-    // Fill canvas maintaining aspect ratio (cover)
-    const iw = state.image.width, ih = state.image.height;
-    const cw = canvas.width, ch = canvas.height;
-    const scale = Math.max(cw / iw, ch / ih);
-    const sw = iw * scale, sh = ih * scale;
-    ctx.drawImage(state.image, (cw - sw) / 2, (ch - sh) / 2, sw, sh);
-  } else {
-    // Placeholder gradient
-    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    grad.addColorStop(0, "#1a1a2e");
-    grad.addColorStop(0.5, "#16213e");
-    grad.addColorStop(1, "#0f3460");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+        <!-- Text Controls -->
+        <section class="ctrl-section">
+          <h2 class="section-head">✍️ Text</h2>
 
-    ctx.font = "bold 20px Nunito, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.2)";
-    ctx.textAlign = "center";
-    ctx.fillText("Upload or select a template ↑", canvas.width / 2, canvas.height / 2);
-  }
+          <div id="textLayers"></div>
+          <button class="btn-outline btn-sm" id="addTextBtn">+ Add Text Layer</button>
 
-  // Overlay
-  drawOverlay();
+          <div class="ctrl-row three-col" style="margin-top:14px;">
+            <div>
+              <label>Font</label>
+              <select id="activeFontFamily">
+                <option value="'Bebas Neue'">Bebas Neue</option>
+                <option value="Impact">Impact</option>
+                <option value="'Syne'">Syne</option>
+                <option value="'Syne Mono'">Syne Mono</option>
+                <option value="'Comic Sans MS'">Comic Sans 😌</option>
+                <option value="'Georgia'">Georgia</option>
+              </select>
+            </div>
+            <div>
+              <label>Size <span id="fontSizeVal">42</span>px</label>
+              <input type="range" id="activeFontSize" min="16" max="100" value="42">
+            </div>
+            <div>
+              <label>Outline <span id="outlineVal">4</span></label>
+              <input type="range" id="activeOutline" min="0" max="12" value="4">
+            </div>
+          </div>
 
-  // Top text
-  drawText(state.topText, canvas.width / 2, state.fontSize + 20, "top");
+          <div class="ctrl-row two-col">
+            <div>
+              <label>Text Color</label>
+              <div class="swatch-row">
+                <div class="swatch active" data-tc="#ffffff" style="background:#fff"></div>
+                <div class="swatch" data-tc="#FFD60A" style="background:#FFD60A"></div>
+                <div class="swatch" data-tc="#E63946" style="background:#E63946"></div>
+                <div class="swatch" data-tc="#06D6A0" style="background:#06D6A0"></div>
+                <div class="swatch" data-tc="#1a1a2e" style="background:#1a1a2e;border:1px solid #555"></div>
+                <input type="color" id="customTextColor" value="#ffffff" title="Custom">
+              </div>
+            </div>
+            <div>
+              <label>Outline Color</label>
+              <div class="swatch-row">
+                <div class="swatch active" data-oc="#000000" style="background:#000;border:1px solid #555"></div>
+                <div class="swatch" data-oc="#E63946" style="background:#E63946"></div>
+                <div class="swatch" data-oc="#FFD60A" style="background:#FFD60A"></div>
+                <div class="swatch" data-oc="#ffffff" style="background:#fff"></div>
+              </div>
+            </div>
+          </div>
 
-  // Bottom text
-  drawText(state.bottomText, canvas.width / 2, canvas.height - 20, "bottom");
-}
+          <!-- Animation -->
+          <label style="margin-top:12px;">Text Animation</label>
+          <div class="anim-grid">
+            <div class="anim-opt active" data-anim="none">Static</div>
+            <div class="anim-opt" data-anim="bounce">Bounce 🏀</div>
+            <div class="anim-opt" data-anim="wave">Wave 🌊</div>
+            <div class="anim-opt" data-anim="shake">Shake 🫨</div>
+            <div class="anim-opt" data-anim="scroll">Scroll ➡️</div>
+            <div class="anim-opt" data-anim="zoom">Zoom 🔍</div>
+          </div>
+        </section>
 
-function drawText(text, x, y, position) {
-  if (!text.trim()) return;
-  const size = parseInt(state.fontSize);
-  ctx.font = `900 ${size}px ${state.fontStyle}, Impact, Arial Black`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = position === "bottom" ? "bottom" : "top";
-  ctx.lineJoin = "round";
+        <!-- Emoji Stickers -->
+        <section class="ctrl-section">
+          <h2 class="section-head">🎨 Emoji Stickers</h2>
+          <p class="section-sub">Click to add · Drag on canvas to reposition</p>
+          <div class="emoji-palette" id="emojiPalette"></div>
+          <button class="btn-outline btn-sm" id="clearStickersBtn" style="margin-top:8px;">🗑 Clear stickers</button>
+        </section>
 
-  const maxWidth = canvas.width - 40;
-  const lines = wrapText(ctx, text.toUpperCase(), maxWidth);
-  const lineH = size * 1.15;
+        <!-- Overlay & Branding -->
+        <section class="ctrl-section">
+          <h2 class="section-head">🏷️ Overlay</h2>
+          <div class="overlay-grid">
+            <div class="overlay-opt active" data-ov="none">None</div>
+            <div class="overlay-opt" data-ov="badge">Badge ❤️</div>
+            <div class="overlay-opt" data-ov="banner">Banner</div>
+            <div class="overlay-opt" data-ov="corner">Corner</div>
+            <div class="overlay-opt" data-ov="vignette">Vignette</div>
+          </div>
+          <label style="margin-top:12px;">Hashtag</label>
+          <input type="text" id="hashtagInput" class="ctrl-input" value="#GivingTuesday">
+        </section>
 
-  lines.forEach((line, i) => {
-    let ly = position === "bottom"
-      ? y - (lines.length - 1 - i) * lineH
-      : y + i * lineH;
+        <!-- Snarky Templates -->
+        <section class="ctrl-section">
+          <h2 class="section-head">😏 Snarky Starters</h2>
+          <p class="section-sub">One-click inspo. You're welcome.</p>
+          <div class="snark-grid" id="snarkGrid"></div>
+        </section>
 
-    if (parseInt(state.outlineWidth) > 0) {
-      ctx.lineWidth = parseInt(state.outlineWidth) * 2;
-      ctx.strokeStyle = state.outlineColor;
-      ctx.strokeText(line, x, ly, maxWidth);
-    }
-    ctx.fillStyle = state.textColor;
-    ctx.fillText(line, x, ly, maxWidth);
-  });
-}
+      </div>
 
-function wrapText(ctx, text, maxWidth) {
-  const words = text.split(" ");
-  const lines = [];
-  let line = "";
-  for (const word of words) {
-    const test = line ? line + " " + word : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
+      <!-- RIGHT: Canvas + actions -->
+      <div class="preview-col">
+        <div class="canvas-card" id="canvasCard">
+          <div class="canvas-wrap" id="canvasWrap">
+            <canvas id="memeCanvas" width="600" height="600"></canvas>
+            <!-- Emoji sticker overlay (drag layer) -->
+            <div class="sticker-layer" id="stickerLayer"></div>
+            <!-- Animated text overlay -->
+            <div class="anim-text-layer" id="animTextLayer"></div>
+          </div>
+          <div class="canvas-hint" id="canvasHint">Select an image or template to get cooking 🍳</div>
+        </div>
 
-function drawOverlay() {
-  const ov = state.overlay;
-  if (ov === "none") return;
+        <div class="action-row">
+          <button class="btn-red btn-lg" id="downloadBtn">⬇ Download</button>
+          <button class="btn-ghost btn-lg" id="copyBtn">📋 Copy</button>
+          <button class="btn-teal btn-lg" id="saveBtn">💾 Save Meme</button>
+        </div>
+        <div class="share-row">
+          <button class="share-btn tw" id="twitterBtn">𝕏 Share</button>
+          <button class="share-btn fb" id="facebookBtn">f Share</button>
+          <button class="share-btn ig" id="igBtn">📸 Instagram</button>
+        </div>
 
-  const cw = canvas.width, ch = canvas.height;
+        <div class="snark-footer">
+          <p>"Every great social movement started with a meme. Probably." — Someone, 2024</p>
+        </div>
+      </div>
 
-  if (ov === "badge") {
-    // Red heart badge bottom-right
-    const bx = cw - 130, by = ch - 130, br = 50;
-    ctx.beginPath();
-    ctx.arc(bx + br, by + br, br, 0, Math.PI * 2);
-    ctx.fillStyle = "#E63946";
-    ctx.fill();
-    ctx.font = "bold 28px Nunito, sans-serif";
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("❤️", bx + br, by + br - 6);
-    ctx.font = "bold 11px Nunito, sans-serif";
-    ctx.fillText("GIVING", bx + br, by + br + 14);
-    ctx.font = "bold 9px Nunito, sans-serif";
-    ctx.fillText("TUESDAY", bx + br, by + br + 26);
+    </div>
+  </div>
 
-  } else if (ov === "banner") {
-    // Bottom banner ribbon
-    ctx.fillStyle = "rgba(230,57,70,0.9)";
-    ctx.fillRect(0, ch - 50, cw, 50);
-    ctx.font = "bold 20px 'Bebas Neue', Impact";
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.letterSpacing = "3px";
-    ctx.fillText("❤️  " + (state.hashtag || "#GivingTuesday") + "  ❤️", cw / 2, ch - 25);
-    ctx.letterSpacing = "";
+  <!-- GALLERY PAGE -->
+  <div id="page-gallery" class="page hidden">
+    <div class="page-header">
+      <h1 class="page-title">Community Meme Gallery</h1>
+      <p class="page-sub">Where generosity gets a little unhinged. In a good way.</p>
+    </div>
+    <div class="gallery-filters">
+      <button class="filter-btn active" data-filter="all">All Memes</button>
+      <button class="filter-btn" data-filter="mine">Mine</button>
+      <button class="filter-btn" data-filter="top">Most Loved</button>
+    </div>
+    <div class="gallery-grid" id="galleryGrid">
+      <div class="gallery-empty">
+        <p>👀 No memes yet. Be the change you wish to see.</p>
+        <button class="btn-red" onclick="showPage('create')">Make one now</button>
+      </div>
+    </div>
+  </div>
 
-  } else if (ov === "corner") {
-    // Top-left corner ribbon
-    ctx.save();
-    ctx.translate(0, 0);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(160, 0);
-    ctx.lineTo(0, 160);
-    ctx.closePath();
-    ctx.fillStyle = "#E63946";
-    ctx.fill();
-    ctx.save();
-    ctx.translate(50, 50);
-    ctx.rotate(-Math.PI / 4);
-    ctx.font = "bold 13px Nunito, sans-serif";
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("❤️ GIVING", 0, -8);
-    ctx.fillText("TUESDAY", 0, 8);
-    ctx.restore();
-    ctx.restore();
-  }
-}
+  <!-- LEADERBOARD PAGE -->
+  <div id="page-leaderboard" class="page hidden">
+    <div class="page-header">
+      <h1 class="page-title">🏆 Leaderboard</h1>
+      <p class="page-sub">Who's spreading joy the hardest? Science demands to know.</p>
+    </div>
+    <div class="leaderboard-wrap">
+      <div class="leaderboard-table" id="leaderboardTable">
+        <div class="lb-loading">Loading the hall of fame...</div>
+      </div>
+    </div>
+  </div>
 
-// ─── Templates ───────────────────────────────────────────────────────────────
-const templates = [
-  { label: "Kind Person",    emoji: "🤝", bg: ["#2d6a4f","#1b4332"], text: "#GivingTuesday" },
-  { label: "Change Maker",   emoji: "🌍", bg: ["#0077b6","#03045e"], text: "Change the World" },
-  { label: "Heart of Gold",  emoji: "❤️", bg: ["#c9184a","#800f2f"], text: "Give with Love" },
-  { label: "Sunbeam",        emoji: "✨", bg: ["#e9c46a","#f4a261"], text: "#GivingTuesday" },
-  { label: "Volunteer",      emoji: "🙌", bg: ["#480ca8","#3a0ca3"], text: "Volunteer Today" },
-  { label: "Hope",           emoji: "🕊️", bg: ["#4cc9f0","#4361ee"], text: "Hope Is Free" },
-];
+</main>
 
-function buildTemplateGrid() {
-  const grid = document.getElementById("templateGrid");
-  templates.forEach((t, i) => {
-    const el = document.createElement("div");
-    el.className = "template-thumb";
+<!-- ░░ AUTH MODAL ░░ -->
+<div class="modal-backdrop hidden" id="authModal">
+  <div class="modal">
+    <button class="modal-close" id="closeModal">✕</button>
+    <div class="modal-logo">❤️</div>
+    <h2 class="modal-title" id="modalTitle">Welcome back, hero.</h2>
+    <p class="modal-sub" id="modalSub">Log in to save memes, flex on the leaderboard, and stamp your name on greatness.</p>
 
-    // Generate mini canvas for template thumbnail
-    const tc = document.createElement("canvas");
-    tc.width = 80; tc.height = 80;
-    const tcx = tc.getContext("2d");
-    const gr = tcx.createLinearGradient(0, 0, 80, 80);
-    gr.addColorStop(0, t.bg[0]);
-    gr.addColorStop(1, t.bg[1]);
-    tcx.fillStyle = gr;
-    tcx.fillRect(0, 0, 80, 80);
-    tcx.font = "32px serif";
-    tcx.textAlign = "center";
-    tcx.textBaseline = "middle";
-    tcx.fillText(t.emoji, 40, 35);
-    tcx.font = "bold 8px Arial";
-    tcx.fillStyle = "rgba(255,255,255,0.7)";
-    tcx.fillText(t.text.toUpperCase().substring(0, 14), 40, 66);
-    el.appendChild(tc);
+    <div id="authError" class="auth-error hidden"></div>
 
-    const lbl = document.createElement("div");
-    lbl.className = "template-label";
-    lbl.textContent = t.label;
-    el.appendChild(lbl);
+    <input type="text" id="authUsername" class="modal-input" placeholder="Username (displayed on memes)" style="display:none;">
+    <input type="email" id="authEmail" class="modal-input" placeholder="your@email.com">
+    <input type="password" id="authPassword" class="modal-input" placeholder="Password (make it a good one)">
 
-    el.addEventListener("click", () => {
-      document.querySelectorAll(".template-thumb").forEach(e => e.classList.remove("active"));
-      el.classList.add("active");
-      loadTemplate(t);
-    });
+    <button class="btn-red btn-full" id="authSubmitBtn">Let's go →</button>
+    <button class="btn-ghost btn-full" id="authSwitchBtn">Don't have an account? Join free.</button>
 
-    grid.appendChild(el);
-  });
-}
+    <div class="modal-divider"><span>or</span></div>
+    <button class="btn-google btn-full" id="googleAuthBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
 
-function loadTemplate(t) {
-  const offscreen = document.createElement("canvas");
-  offscreen.width = 600; offscreen.height = 600;
-  const oct = offscreen.getContext("2d");
-  const gr = oct.createLinearGradient(0, 0, 600, 600);
-  gr.addColorStop(0, t.bg[0]);
-  gr.addColorStop(1, t.bg[1]);
-  oct.fillStyle = gr;
-  oct.fillRect(0, 0, 600, 600);
-  // Big emoji center
-  oct.font = "200px serif";
-  oct.textAlign = "center";
-  oct.textBaseline = "middle";
-  oct.fillText(t.emoji, 300, 300);
+<!-- ░░ TOAST ░░ -->
+<div class="toast" id="toast"></div>
 
-  const img = new Image();
-  img.onload = () => { state.image = img; drawMeme(); };
-  img.src = offscreen.toDataURL();
-}
-
-// ─── Event Wiring ─────────────────────────────────────────────────────────────
-function bindEvents() {
-  // Upload
-  const imgInput = document.getElementById("imgInput");
-  imgInput.addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => { state.image = img; drawMeme(); };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-    document.querySelectorAll(".template-thumb").forEach(e => e.classList.remove("active"));
-  });
-
-  // Drag and drop
-  const uploadArea = document.getElementById("uploadArea");
-  uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("dragover"); });
-  uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
-  uploadArea.addEventListener("drop", e => {
-    e.preventDefault();
-    uploadArea.classList.remove("dragover");
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => { state.image = img; drawMeme(); };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // Text
-  document.getElementById("topText").addEventListener("input", e => { state.topText = e.target.value; drawMeme(); });
-  document.getElementById("bottomText").addEventListener("input", e => { state.bottomText = e.target.value; drawMeme(); });
-  document.getElementById("hashtagText").addEventListener("input", e => { state.hashtag = e.target.value; drawMeme(); });
-
-  // Font
-  document.getElementById("fontSize").addEventListener("input", e => { state.fontSize = e.target.value; drawMeme(); });
-  document.getElementById("fontStyle").addEventListener("change", e => { state.fontStyle = e.target.value; drawMeme(); });
-  document.getElementById("outlineWidth").addEventListener("input", e => { state.outlineWidth = e.target.value; drawMeme(); });
-
-  // Text color swatches
-  document.querySelectorAll("[data-color]").forEach(el => {
-    el.addEventListener("click", () => {
-      document.querySelectorAll("[data-color]").forEach(e => e.classList.remove("active"));
-      el.classList.add("active");
-      state.textColor = el.dataset.color;
-      document.getElementById("customColor").value = el.dataset.color;
-      drawMeme();
-    });
-  });
-
-  document.getElementById("customColor").addEventListener("input", e => {
-    state.textColor = e.target.value;
-    document.querySelectorAll("[data-color]").forEach(el => el.classList.remove("active"));
-    drawMeme();
-  });
-
-  // Outline color
-  document.querySelectorAll("[data-outline]").forEach(el => {
-    el.addEventListener("click", () => {
-      document.querySelectorAll("[data-outline]").forEach(e => e.classList.remove("active"));
-      el.classList.add("active");
-      state.outlineColor = el.dataset.outline;
-      drawMeme();
-    });
-  });
-
-  // Overlay
-  document.querySelectorAll("[data-overlay]").forEach(el => {
-    el.addEventListener("click", () => {
-      document.querySelectorAll("[data-overlay]").forEach(e => e.classList.remove("active"));
-      el.classList.add("active");
-      state.overlay = el.dataset.overlay;
-      drawMeme();
-    });
-  });
-
-  // Download
-  document.getElementById("downloadBtn").addEventListener("click", () => {
-    const a = document.createElement("a");
-    a.download = "givingtuesday-meme.png";
-    a.href = canvas.toDataURL("image/png");
-    a.click();
-  });
-
-  // Copy
-  document.getElementById("copyBtn").addEventListener("click", async () => {
-    try {
-      canvas.toBlob(async blob => {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        showToast("📋 Copied to clipboard!");
-      });
-    } catch {
-      showToast("⬇ Use download instead!");
-    }
-  });
-
-  // Share stubs
-  document.getElementById("twitterBtn").addEventListener("click", () => {
-    const txt = encodeURIComponent(state.hashtag + " " + state.topText + " " + state.bottomText);
-    window.open(`https://twitter.com/intent/tweet?text=${txt}&url=https://www.givingtuesday.org`, "_blank");
-  });
-
-  document.getElementById("facebookBtn").addEventListener("click", () => {
-    window.open("https://www.facebook.com/sharer/sharer.php?u=https://www.givingtuesday.org", "_blank");
-  });
-
-  document.getElementById("igBtn").addEventListener("click", () => {
-    // Download for Instagram
-    const a = document.createElement("a");
-    a.download = "givingtuesday-meme-ig.png";
-    a.href = canvas.toDataURL("image/png");
-    a.click();
-    showToast("📸 Saved! Upload to Instagram");
-  });
-}
-
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 2500);
-}
-
-// ─── Background dots ──────────────────────────────────────────────────────────
-function spawnDots() {
-  const container = document.getElementById("bgDots");
-  const colors = ["#E63946","#FFD60A","#06D6A0","#ffffff"];
-  for (let i = 0; i < 30; i++) {
-    const dot = document.createElement("div");
-    dot.className = "dot";
-    const size = Math.random() * 12 + 4;
-    dot.style.cssText = `
-      width:${size}px; height:${size}px;
-      left:${Math.random() * 100}%;
-      bottom:-${size}px;
-      background:${colors[Math.floor(Math.random() * colors.length)]};
-      animation-duration:${8 + Math.random() * 14}s;
-      animation-delay:${Math.random() * 12}s;
-    `;
-    container.appendChild(dot);
-  }
-}
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
-buildTemplateGrid();
-bindEvents();
-spawnDots();
-drawMeme();
-</script>
+<!-- Firebase SDK -->
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
