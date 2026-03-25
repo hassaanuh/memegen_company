@@ -113,17 +113,16 @@ document.getElementById("randomNameBtn").addEventListener("click", () => {
 });
 
 // ─── STATE ────────────────────────────────────────────────
-// x/y are fractions (0–1) of canvas width/height — the anchor point is
-// the center of the text block. fontSize is per-layer (not shared).
+// x/y are 0–1 fractions of canvas size (center of text block).
+// fontSize is stored per-layer so each layer can be independently sized.
 const state = {
   image: null,
   textLayers: [
-    { text: "WHEN YOU DONATE $5",  x: 0.5, y: 0.08, fontSize: 42, color: "#ffffff" },
+    { text: "WHEN YOU DONATE $5",  x: 0.5, y: 0.1,  fontSize: 42, color: "#ffffff" },
     { text: "AND BECOME A LEGEND", x: 0.5, y: 0.88, fontSize: 42, color: "#FFD60A" },
   ],
   activeFontFamily:   "'Bebas Neue'",
   activeOutline:      4,
-  activeTextColor:    "#ffffff",
   activeOutlineColor: "#000000",
   textAnimation:      "none",
   overlay:            "none",
@@ -136,11 +135,13 @@ const canvas       = document.getElementById("memeCanvas");
 const ctx          = canvas.getContext("2d");
 const stickerLayer = document.getElementById("stickerLayer");
 const animLayer    = document.getElementById("animTextLayer");
+const canvasWrap   = document.getElementById("canvasWrap");
 
-// ─── DRAW ─────────────────────────────────────────────────
+// ─── MAIN DRAW ────────────────────────────────────────────
 function drawMeme() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Background image or gradient placeholder
   if (state.image) {
     document.getElementById("canvasHint").classList.add("hidden");
     const { width: iw, height: ih } = state.image;
@@ -150,31 +151,33 @@ function drawMeme() {
   } else {
     const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     g.addColorStop(0, "#1a1a2e"); g.addColorStop(1, "#16213e");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   drawOverlay();
 
-  if (state.textAnimation === "none") renderTextCanvas();
-  else renderAnimDOM();
+  // Static text drawn to canvas; animated text uses DOM overlay
+  if (state.textAnimation === "none") {
+    animLayer.innerHTML = "";
+    state.textLayers.forEach(l => { if (l.text.trim()) drawLayerText(l); });
+  } else {
+    renderAnimDOM();
+  }
 
+  // Always re-render the drag/resize handle boxes
   renderHandles();
 }
 
-// Draw all text layers onto the canvas (no animation)
-function renderTextCanvas() {
-  animLayer.innerHTML = "";
-  state.textLayers.forEach(l => { if (l.text.trim()) drawLayerText(l); });
-}
-
+// ─── CANVAS TEXT RENDERING ────────────────────────────────
 function drawLayerText(layer) {
   const size = layer.fontSize;
-  ctx.font = `900 ${size}px ${state.activeFontFamily}, Impact`;
-  ctx.textAlign = "center";
+  ctx.font        = `900 ${size}px ${state.activeFontFamily}, Impact`;
+  ctx.textAlign   = "center";
   ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
+  ctx.lineJoin    = "round";
 
-  const maxW = canvas.width - 40;
+  const maxW  = canvas.width - 40;
   const lines = wrapText(layer.text.toUpperCase(), maxW, size);
   const lineH = size * 1.2;
   const totalH = lines.length * lineH;
@@ -184,7 +187,7 @@ function drawLayerText(layer) {
   lines.forEach((line, i) => {
     const y = cy - totalH / 2 + lineH * i + lineH / 2;
     if (+state.activeOutline > 0) {
-      ctx.lineWidth = +state.activeOutline * 2;
+      ctx.lineWidth   = +state.activeOutline * 2;
       ctx.strokeStyle = state.activeOutlineColor;
       ctx.strokeText(line, cx, y, maxW);
     }
@@ -195,7 +198,9 @@ function drawLayerText(layer) {
 
 function wrapText(text, maxW, size) {
   ctx.font = `900 ${size}px ${state.activeFontFamily}, Impact`;
-  const words = text.split(" "); const lines = []; let line = "";
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
   for (const w of words) {
     const test = line ? line + " " + w : w;
     if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
@@ -205,89 +210,96 @@ function wrapText(text, maxW, size) {
   return lines;
 }
 
-// ─── ANIMATED TEXT DOM LAYER ──────────────────────────────
+// ─── ANIMATED TEXT DOM OVERLAY ────────────────────────────
 function renderAnimDOM() {
   animLayer.innerHTML = "";
-  const pct = canvas.offsetHeight / canvas.height;
+  const scaleY = canvas.offsetHeight / canvas.height;
   state.textLayers.forEach((l, i) => {
     if (!l.text.trim()) return;
-    const el = document.createElement("div");
+    const el  = document.createElement("div");
     el.className = `anim-text-el anim-${state.textAnimation}`;
-    const size = Math.round(l.fontSize * pct);
+    const size = Math.round(l.fontSize * scaleY);
     el.style.cssText = `
-      font-size:${size}px;
-      font-family:${state.activeFontFamily},Impact;
-      color:${l.color};
-      -webkit-text-stroke:${Math.round(+state.activeOutline * pct * 0.5)}px ${state.activeOutlineColor};
-      left:${l.x * 100}%; top:${l.y * 100}%;
-      transform:translate(-50%,-50%);
-      animation-delay:${i * 0.15}s;
-      width:90%; text-align:center;
+      font-size: ${size}px;
+      font-family: ${state.activeFontFamily}, Impact;
+      color: ${l.color};
+      -webkit-text-stroke: ${Math.round(+state.activeOutline * scaleY * 0.5)}px ${state.activeOutlineColor};
+      left: ${l.x * 100}%;
+      top: ${l.y * 100}%;
+      transform: translate(-50%, -50%);
+      animation-delay: ${i * 0.15}s;
+      width: 90%;
+      text-align: center;
     `;
-    if (state.textAnimation === "scroll") { el.style.left="-100%"; el.style.transform="none"; }
+    if (state.textAnimation === "scroll") {
+      el.style.left = "-100%";
+      el.style.transform = "translateY(-50%)";
+    }
     el.textContent = l.text.toUpperCase();
     animLayer.appendChild(el);
   });
 }
 
 // ─── DRAG + RESIZE HANDLE OVERLAY ────────────────────────
-// A transparent DOM layer sits over the canvas.
-// Each text layer gets a box with 4 corner resize handles.
-// This layer is hidden before any image export.
+// The handle layer is a transparent DOM div covering the canvas.
+// pointer-events:none on the container, pointer-events:all on each box
+// so clicks on empty canvas areas pass through to the canvas itself.
 let handleLayer = null;
 
-function getOrCreateHandleLayer() {
+function getHandleLayer() {
   if (handleLayer) return handleLayer;
   handleLayer = document.createElement("div");
   handleLayer.className = "handle-layer";
-  document.getElementById("canvasWrap").appendChild(handleLayer);
+  canvasWrap.appendChild(handleLayer);
   return handleLayer;
 }
 
 function renderHandles() {
-  const layer = getOrCreateHandleLayer();
+  const layer = getHandleLayer();
   layer.innerHTML = "";
+
+  // Scale factors: canvas coords → displayed pixel coords
+  const scaleX = canvas.offsetWidth  / canvas.width;
+  const scaleY = canvas.offsetHeight / canvas.height;
 
   state.textLayers.forEach((tl, i) => {
     if (!tl.text.trim()) return;
 
-    // Measure the text bounding box in canvas space
-    const size = tl.fontSize;
-    ctx.font = `900 ${size}px ${state.activeFontFamily}, Impact`;
-    const maxW = canvas.width - 40;
+    // Measure text in canvas-space pixels
+    const size  = tl.fontSize;
+    ctx.font    = `900 ${size}px ${state.activeFontFamily}, Impact`;
+    const maxW  = canvas.width - 40;
     const lines = wrapText(tl.text.toUpperCase(), maxW, size);
     const lineH = size * 1.2;
     const rawW  = Math.min(maxW, Math.max(...lines.map(ln => ctx.measureText(ln).width)));
     const rawH  = lines.length * lineH;
 
-    // Scale to displayed canvas size
-    const scaleX = canvas.offsetWidth  / canvas.width;
-    const scaleY = canvas.offsetHeight / canvas.height;
-    const boxW   = (rawW  * scaleX / canvas.offsetWidth)  * 100; // % of wrap width
-    const boxH   = (rawH  * scaleY / canvas.offsetHeight) * 100; // % of wrap height
+    // Convert to % of displayed canvas wrapper
+    const boxW = (rawW  * scaleX / canvas.offsetWidth)  * 100;
+    const boxH = (rawH  * scaleY / canvas.offsetHeight) * 100;
+    const boxL = tl.x * 100;
+    const boxT = tl.y * 100;
 
     const isActive = i === state.activeLayerIndex;
 
     const box = document.createElement("div");
     box.className = "text-handle-box" + (isActive ? " active" : "");
     box.style.cssText = `
-      left:${tl.x * 100}%;
-      top:${tl.y * 100}%;
-      width:${boxW}%;
-      height:${boxH}%;
-      transform:translate(-50%,-50%);
+      left: ${boxL}%;
+      top: ${boxT}%;
+      width: ${boxW}%;
+      height: ${boxH}%;
+      transform: translate(-50%, -50%);
     `;
-    box.dataset.index = i;
-    box.title = "Drag to move · corners to resize";
 
-    // Drag body to move
-    makeDraggableText(box, i);
+    // Drag the whole box to reposition text
+    attachDrag(box, i);
 
-    // 4 corner resize handles
-    ["nw","ne","sw","se"].forEach(corner => {
+    // Four corner handles for resizing
+    ["nw", "ne", "sw", "se"].forEach(corner => {
       const h = document.createElement("div");
       h.className = `resize-handle resize-${corner}`;
-      makeResizable(h, i, corner);
+      attachResize(h, i, corner);
       box.appendChild(h);
     });
 
@@ -295,67 +307,76 @@ function renderHandles() {
   });
 }
 
-function selectLayer(i) {
-  state.activeLayerIndex = i;
-  const layer = state.textLayers[i];
-  if (layer) {
-    document.getElementById("activeFontSize").value = layer.fontSize;
-    document.getElementById("fontSizeVal").textContent = layer.fontSize;
-  }
-  document.querySelectorAll(".text-layer-row input").forEach((el, idx) => {
-    el.classList.toggle("layer-active", idx === i);
-  });
-  drawMeme();
-}
-
-function makeDraggableText(box, layerIndex) {
-  let startX, startY, startLX, startLY, dragging = false;
+// ─── DRAG LOGIC ───────────────────────────────────────────
+function attachDrag(box, layerIndex) {
+  let dragging = false;
+  let startClientX, startClientY, startLX, startLY;
 
   box.addEventListener("pointerdown", e => {
     if (e.target.classList.contains("resize-handle")) return;
+    e.preventDefault();
+    e.stopPropagation();
     dragging = true;
-    startX = e.clientX; startY = e.clientY;
+    startClientX = e.clientX;
+    startClientY = e.clientY;
     startLX = state.textLayers[layerIndex].x;
     startLY = state.textLayers[layerIndex].y;
     box.setPointerCapture(e.pointerId);
-    box.style.cursor = "grabbing";
     selectLayer(layerIndex);
-    e.stopPropagation();
   });
 
   box.addEventListener("pointermove", e => {
     if (!dragging) return;
-    const wrap = document.getElementById("canvasWrap").getBoundingClientRect();
-    const dx = (e.clientX - startX) / wrap.width;
-    const dy = (e.clientY - startY) / wrap.height;
+    e.preventDefault();
+    const rect = canvasWrap.getBoundingClientRect();
+    const dx = (e.clientX - startClientX) / rect.width;
+    const dy = (e.clientY - startClientY) / rect.height;
     state.textLayers[layerIndex].x = Math.max(0.02, Math.min(0.98, startLX + dx));
     state.textLayers[layerIndex].y = Math.max(0.02, Math.min(0.98, startLY + dy));
     drawMeme();
   });
 
-  box.addEventListener("pointerup", () => { dragging = false; box.style.cursor = ""; });
+  box.addEventListener("pointerup", e => {
+    dragging = false;
+  });
+
+  box.addEventListener("pointercancel", () => { dragging = false; });
 }
 
-function makeResizable(handle, layerIndex, corner) {
-  let startX, startY, startSize, dragging = false;
+// ─── RESIZE LOGIC ─────────────────────────────────────────
+function attachResize(handle, layerIndex, corner) {
+  let resizing = false;
+  let startClientX, startClientY, startSize;
 
   handle.addEventListener("pointerdown", e => {
+    e.preventDefault();
     e.stopPropagation();
-    dragging = true;
-    startX = e.clientX; startY = e.clientY;
+    resizing = true;
+    startClientX = e.clientX;
+    startClientY = e.clientY;
     startSize = state.textLayers[layerIndex].fontSize;
     handle.setPointerCapture(e.pointerId);
+    selectLayer(layerIndex);
   });
 
   handle.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    const wrap = document.getElementById("canvasWrap").getBoundingClientRect();
-    const dx = (e.clientX - startX) / wrap.width;
-    const dy = (e.clientY - startY) / wrap.height;
-    // Map drag direction to grow/shrink depending on corner
-    const delta = (corner === "se" || corner === "ne") ? dx - dy : dy - dx;
-    const newSize = Math.max(12, Math.min(120, Math.round(startSize + delta * 200)));
+    if (!resizing) return;
+    e.preventDefault();
+    const rect = canvasWrap.getBoundingClientRect();
+    const dx = (e.clientX - startClientX) / rect.width;
+    const dy = (e.clientY - startClientY) / rect.height;
+    // Direction: dragging right/down = bigger, left/up = smaller
+    // Adjust sign based on which corner
+    let delta;
+    if      (corner === "se") delta =  dx - dy;
+    else if (corner === "sw") delta = -dx - dy;
+    else if (corner === "ne") delta =  dx + dy;
+    else                      delta = -dx + dy; // nw
+
+    const newSize = Math.max(12, Math.min(120, Math.round(startSize + delta * 300)));
     state.textLayers[layerIndex].fontSize = newSize;
+
+    // Keep sidebar slider in sync for active layer
     if (layerIndex === state.activeLayerIndex) {
       document.getElementById("activeFontSize").value = newSize;
       document.getElementById("fontSizeVal").textContent = newSize;
@@ -363,43 +384,63 @@ function makeResizable(handle, layerIndex, corner) {
     drawMeme();
   });
 
-  handle.addEventListener("pointerup", () => { dragging = false; });
+  handle.addEventListener("pointerup", () => { resizing = false; });
+  handle.addEventListener("pointercancel", () => { resizing = false; });
 }
 
-// Click canvas background to deselect
-document.getElementById("canvasWrap").addEventListener("click", e => {
-  if (e.target === canvas) { state.activeLayerIndex = -1; drawMeme(); }
+// ─── LAYER SELECTION ──────────────────────────────────────
+function selectLayer(i) {
+  state.activeLayerIndex = i;
+  const layer = state.textLayers[i];
+  if (layer) {
+    document.getElementById("activeFontSize").value = layer.fontSize;
+    document.getElementById("fontSizeVal").textContent = layer.fontSize;
+  }
+  // Highlight active input in sidebar
+  document.querySelectorAll(".text-layer-row input").forEach((el, idx) => {
+    el.classList.toggle("layer-active", idx === i);
+  });
+}
+
+// Clicking the raw canvas (not a handle box) deselects
+canvas.addEventListener("pointerdown", () => {
+  state.activeLayerIndex = -1;
+  drawMeme();
 });
 
 // ─── DRAW OVERLAY ─────────────────────────────────────────
 function drawOverlay() {
-  const ov = state.overlay; if (ov === "none") return;
+  const ov = state.overlay;
+  if (ov === "none") return;
   const cw = canvas.width, ch = canvas.height;
+
   if (ov === "vignette") {
-    const g = ctx.createRadialGradient(cw/2,ch/2,ch*0.3,cw/2,ch/2,ch*0.75);
-    g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,0.65)");
-    ctx.fillStyle = g; ctx.fillRect(0,0,cw,ch);
+    const g = ctx.createRadialGradient(cw/2, ch/2, ch*0.3, cw/2, ch/2, ch*0.75);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.65)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
   } else if (ov === "badge") {
     const bx = cw-130, by = ch-130, br = 50;
-    ctx.beginPath(); ctx.arc(bx+br,by+br,br,0,Math.PI*2);
-    ctx.fillStyle="#E63946"; ctx.fill();
-    ctx.font="bold 26px Syne,sans-serif"; ctx.fillStyle="#fff";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("❤️",bx+br,by+br-8);
-    ctx.font="bold 10px Syne,sans-serif";
-    ctx.fillText("GIVING",bx+br,by+br+12); ctx.fillText("TUESDAY",bx+br,by+br+24);
+    ctx.beginPath(); ctx.arc(bx+br, by+br, br, 0, Math.PI*2);
+    ctx.fillStyle = "#E63946"; ctx.fill();
+    ctx.font = "bold 26px Syne, sans-serif"; ctx.fillStyle = "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("❤️", bx+br, by+br-8);
+    ctx.font = "bold 10px Syne, sans-serif";
+    ctx.fillText("GIVING", bx+br, by+br+12);
+    ctx.fillText("TUESDAY", bx+br, by+br+24);
   } else if (ov === "banner") {
-    ctx.fillStyle="rgba(230,57,70,0.92)"; ctx.fillRect(0,ch-52,cw,52);
-    ctx.font=`bold 20px 'Bebas Neue',Impact`; ctx.fillStyle="#fff";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("❤️  "+(state.hashtag||"#GivingTuesday")+"  ❤️",cw/2,ch-26);
+    ctx.fillStyle = "rgba(230,57,70,0.92)"; ctx.fillRect(0, ch-52, cw, 52);
+    ctx.font = `bold 20px 'Bebas Neue', Impact`; ctx.fillStyle = "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("❤️  " + (state.hashtag || "#GivingTuesday") + "  ❤️", cw/2, ch-26);
   } else if (ov === "corner") {
-    ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(160,0); ctx.lineTo(0,160);
-    ctx.closePath(); ctx.fillStyle="#E63946"; ctx.fill();
+    ctx.save(); ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(160,0); ctx.lineTo(0,160);
+    ctx.closePath(); ctx.fillStyle = "#E63946"; ctx.fill();
     ctx.save(); ctx.translate(50,50); ctx.rotate(-Math.PI/4);
-    ctx.font="bold 12px Syne,sans-serif"; ctx.fillStyle="#fff";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("❤️ GIVING",0,-8); ctx.fillText("TUESDAY",0,8);
+    ctx.font = "bold 12px Syne, sans-serif"; ctx.fillStyle = "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("❤️ GIVING", 0, -8); ctx.fillText("TUESDAY", 0, 8);
     ctx.restore(); ctx.restore();
   }
 }
@@ -407,7 +448,8 @@ function drawOverlay() {
 // ─── STICKER DRAG ─────────────────────────────────────────
 function addSticker(emoji) {
   const el = document.createElement("div");
-  el.className = "sticker-el"; el.textContent = emoji;
+  el.className = "sticker-el";
+  el.textContent = emoji;
   el.style.left = (15 + Math.random() * 65) + "%";
   el.style.top  = (15 + Math.random() * 65) + "%";
   makeDraggableSticker(el);
@@ -415,19 +457,21 @@ function addSticker(emoji) {
 }
 
 function makeDraggableSticker(el) {
-  let ox=0, oy=0, dragging=false;
+  let ox = 0, oy = 0, dragging = false;
   el.addEventListener("pointerdown", e => {
-    dragging=true; const r=el.getBoundingClientRect();
-    ox=e.clientX-r.left; oy=e.clientY-r.top;
-    el.setPointerCapture(e.pointerId); el.style.zIndex=99;
+    e.stopPropagation();
+    dragging = true;
+    const r = el.getBoundingClientRect();
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
+    el.setPointerCapture(e.pointerId); el.style.zIndex = 99;
   });
   el.addEventListener("pointermove", e => {
     if (!dragging) return;
-    const wrap = document.getElementById("canvasWrap").getBoundingClientRect();
-    el.style.left = Math.max(0,Math.min(90,((e.clientX-ox-wrap.left)/wrap.width)*100))+"%";
-    el.style.top  = Math.max(0,Math.min(90,((e.clientY-oy-wrap.top)/wrap.height)*100))+"%";
+    const wrap = canvasWrap.getBoundingClientRect();
+    el.style.left = Math.max(0, Math.min(90, ((e.clientX - ox - wrap.left) / wrap.width)  * 100)) + "%";
+    el.style.top  = Math.max(0, Math.min(90, ((e.clientY - oy - wrap.top)  / wrap.height) * 100)) + "%";
   });
-  el.addEventListener("pointerup", () => { dragging=false; el.style.zIndex=""; });
+  el.addEventListener("pointerup", () => { dragging = false; el.style.zIndex = ""; });
 }
 
 // ─── TEMPLATES ────────────────────────────────────────────
@@ -443,20 +487,20 @@ const TEMPLATES = [
 function buildTemplates() {
   const shelf = document.getElementById("templateShelf");
   TEMPLATES.forEach(t => {
-    const wrap = document.createElement("div"); wrap.className="tpl-thumb";
-    const tc = Object.assign(document.createElement("canvas"),{width:80,height:80});
+    const wrap = document.createElement("div"); wrap.className = "tpl-thumb";
+    const tc = Object.assign(document.createElement("canvas"), { width:80, height:80 });
     const tcx = tc.getContext("2d");
     const gr = tcx.createLinearGradient(0,0,80,80);
-    gr.addColorStop(0,t.bg[0]); gr.addColorStop(1,t.bg[1]);
-    tcx.fillStyle=gr; tcx.fillRect(0,0,80,80);
-    tcx.font="30px serif"; tcx.textAlign="center"; tcx.textBaseline="middle";
-    tcx.fillText(t.emoji,40,34);
-    tcx.font="bold 7px Arial"; tcx.fillStyle="rgba(255,255,255,0.65)";
-    tcx.fillText("GIVING TUESDAY",40,67);
-    const lbl = document.createElement("div"); lbl.className="tpl-label"; lbl.textContent=t.label;
+    gr.addColorStop(0, t.bg[0]); gr.addColorStop(1, t.bg[1]);
+    tcx.fillStyle = gr; tcx.fillRect(0,0,80,80);
+    tcx.font = "30px serif"; tcx.textAlign = "center"; tcx.textBaseline = "middle";
+    tcx.fillText(t.emoji, 40, 34);
+    tcx.font = "bold 7px Arial"; tcx.fillStyle = "rgba(255,255,255,0.65)";
+    tcx.fillText("GIVING TUESDAY", 40, 67);
+    const lbl = document.createElement("div"); lbl.className = "tpl-label"; lbl.textContent = t.label;
     wrap.appendChild(tc); wrap.appendChild(lbl);
     wrap.addEventListener("click", () => {
-      document.querySelectorAll(".tpl-thumb").forEach(e=>e.classList.remove("active"));
+      document.querySelectorAll(".tpl-thumb").forEach(e => e.classList.remove("active"));
       wrap.classList.add("active"); loadTemplate(t);
     });
     shelf.appendChild(wrap);
@@ -464,16 +508,16 @@ function buildTemplates() {
 }
 
 function loadTemplate(t) {
-  const off = Object.assign(document.createElement("canvas"),{width:600,height:600});
+  const off = Object.assign(document.createElement("canvas"), { width:600, height:600 });
   const oct = off.getContext("2d");
   const gr = oct.createLinearGradient(0,0,600,600);
-  gr.addColorStop(0,t.bg[0]); gr.addColorStop(1,t.bg[1]);
-  oct.fillStyle=gr; oct.fillRect(0,0,600,600);
-  oct.font="200px serif"; oct.textAlign="center"; oct.textBaseline="middle";
-  oct.fillText(t.emoji,300,300);
-  const img=new Image();
-  img.onload=()=>{state.image=img; drawMeme();};
-  img.src=off.toDataURL();
+  gr.addColorStop(0, t.bg[0]); gr.addColorStop(1, t.bg[1]);
+  oct.fillStyle = gr; oct.fillRect(0,0,600,600);
+  oct.font = "200px serif"; oct.textAlign = "center"; oct.textBaseline = "middle";
+  oct.fillText(t.emoji, 300, 300);
+  const img = new Image();
+  img.onload = () => { state.image = img; drawMeme(); };
+  img.src = off.toDataURL();
 }
 
 // ─── SNARK ────────────────────────────────────────────────
@@ -491,7 +535,7 @@ const SNARK = [
 function buildSnarkGrid() {
   const grid = document.getElementById("snarkGrid");
   SNARK.forEach(s => {
-    const card = document.createElement("div"); card.className="snark-card";
+    const card = document.createElement("div"); card.className = "snark-card";
     card.innerHTML = `<div class="snark-top">${s.top}</div><div class="snark-bot">${s.bot}</div>`;
     card.addEventListener("click", () => {
       state.textLayers[0].text = s.top;
@@ -504,24 +548,23 @@ function buildSnarkGrid() {
 }
 
 // ─── TEXT LAYER UI ────────────────────────────────────────
-// Removed the "pos" dropdown — position is now set by dragging on the canvas.
 function buildTextLayerUI() {
   const container = document.getElementById("textLayers");
   container.innerHTML = "";
   state.textLayers.forEach((layer, i) => {
-    const row = document.createElement("div"); row.className="text-layer-row";
+    const row = document.createElement("div"); row.className = "text-layer-row";
 
     const input = document.createElement("input");
-    input.type="text"; input.value=layer.text;
-    input.placeholder = i===0 ? "Top text..." : i===1 ? "Bottom text..." : "Text...";
+    input.type = "text"; input.value = layer.text;
+    input.placeholder = i === 0 ? "Top text..." : i === 1 ? "Bottom text..." : "Text...";
     if (i === state.activeLayerIndex) input.classList.add("layer-active");
     input.addEventListener("focus", () => selectLayer(i));
-    input.addEventListener("input", e => { layer.text=e.target.value; drawMeme(); });
+    input.addEventListener("input", e => { layer.text = e.target.value; drawMeme(); });
 
-    const delBtn = document.createElement("button"); delBtn.className="text-layer-del"; delBtn.textContent="✕";
+    const delBtn = document.createElement("button"); delBtn.className = "text-layer-del"; delBtn.textContent = "✕";
     delBtn.addEventListener("click", () => {
-      if (state.textLayers.length<=1) return showToast("Need at least one layer 😅");
-      state.textLayers.splice(i,1);
+      if (state.textLayers.length <= 1) return showToast("Need at least one layer 😅");
+      state.textLayers.splice(i, 1);
       state.activeLayerIndex = Math.max(0, state.activeLayerIndex - 1);
       buildTextLayerUI(); drawMeme();
     });
@@ -537,32 +580,38 @@ const EMOJIS = ["❤️","🌍","✨","🙌","💸","🎉","🔥","💪","😂",
 function buildEmojiPalette() {
   const palette = document.getElementById("emojiPalette");
   EMOJIS.forEach(emoji => {
-    const btn = document.createElement("div"); btn.className="emoji-btn"; btn.textContent=emoji;
-    btn.addEventListener("click", () => { addSticker(emoji); showToast(emoji+" sticker added!"); });
+    const btn = document.createElement("div"); btn.className = "emoji-btn"; btn.textContent = emoji;
+    btn.addEventListener("click", () => { addSticker(emoji); showToast(emoji + " sticker added!"); });
     palette.appendChild(btn);
   });
 }
 
-// ─── SAVE MEME ────────────────────────────────────────────
+// ─── EXPORT HELPERS ───────────────────────────────────────
+// Hide the handle overlay before capturing canvas, restore after
+function hideHandles() { if (handleLayer) handleLayer.style.display = "none"; }
+function showHandles() { if (handleLayer) handleLayer.style.display = ""; }
+
+// ─── SAVE TO GALLERY ──────────────────────────────────────
 document.getElementById("saveBtn").addEventListener("click", async () => {
   if (!state.image) { showToast("Add an image first 👀"); return; }
   if (!currentUID)  { showToast("Connecting... try again!"); return; }
   try {
     showToast("🌍 Posting to gallery...");
-    if (handleLayer) handleLayer.style.display = "none";
+    hideHandles();
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    if (handleLayer) handleLayer.style.display = "";
+    showHandles();
     const storageRef = ref(storage, `memes/${currentUID}/${Date.now()}.jpg`);
     await uploadString(storageRef, dataUrl, "data_url");
     const imageUrl = await getDownloadURL(storageRef);
-    await addDoc(collection(db,"memes"), {
-      imageUrl, userId:currentUID, username:getDisplayName(),
-      topText:state.textLayers[0]?.text||"", bottomText:state.textLayers[1]?.text||"",
-      hashtag:state.hashtag, likes:[], likeCount:0, createdAt:serverTimestamp()
+    await addDoc(collection(db, "memes"), {
+      imageUrl, userId: currentUID, username: getDisplayName(),
+      topText: state.textLayers[0]?.text || "",
+      bottomText: state.textLayers[1]?.text || "",
+      hashtag: state.hashtag, likes: [], likeCount: 0, createdAt: serverTimestamp()
     });
-    await updateDoc(doc(db,"users",currentUID), { memeCount:increment(1) });
+    await updateDoc(doc(db, "users", currentUID), { memeCount: increment(1) });
     showToast("🎉 Meme posted! Check the gallery.");
-  } catch(err) { console.error(err); showToast("Post failed — check Firebase setup."); }
+  } catch (err) { console.error(err); showToast("Post failed — check Firebase setup."); }
 });
 
 // ─── GALLERY ──────────────────────────────────────────────
@@ -570,34 +619,37 @@ async function loadGallery(filter = "all") {
   const grid = document.getElementById("galleryGrid");
   grid.innerHTML = `<div class="gallery-empty"><p>Loading memes...</p></div>`;
   try {
-    const q = query(collection(db,"memes"), orderBy("createdAt","desc"), limit(60));
+    const q = query(collection(db, "memes"), orderBy("createdAt", "desc"), limit(60));
     const snap = await getDocs(q);
     if (snap.empty) {
-      grid.innerHTML=`<div class="gallery-empty"><p>👀 Nothing here yet.</p><button class="btn-red" onclick="showPage('create')">Be first</button></div>`;
+      grid.innerHTML = `<div class="gallery-empty"><p>👀 Nothing here yet.</p><button class="btn-red" onclick="showPage('create')">Be first</button></div>`;
       return;
     }
-    let docs = snap.docs.map(d=>({id:d.id,...d.data()}));
-    if (filter==="mine") docs=docs.filter(d=>d.userId===currentUID);
-    if (filter==="top")  docs.sort((a,b)=>(b.likeCount||0)-(a.likeCount||0));
-    if (!docs.length) { grid.innerHTML=`<div class="gallery-empty"><p>Nothing here yet — go make one!</p></div>`; return; }
-    grid.innerHTML="";
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (filter === "mine") docs = docs.filter(d => d.userId === currentUID);
+    if (filter === "top")  docs.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    if (!docs.length) {
+      grid.innerHTML = `<div class="gallery-empty"><p>Nothing here yet — go make one!</p></div>`;
+      return;
+    }
+    grid.innerHTML = "";
     docs.forEach(meme => {
-      const isLiked = (meme.likes||[]).includes(currentUID);
-      const isMine  = meme.userId===currentUID;
+      const isLiked = (meme.likes || []).includes(currentUID);
+      const isMine  = meme.userId === currentUID;
       const timeAgo = meme.createdAt ? formatTime(meme.createdAt.toDate()) : "just now";
-      const card = document.createElement("div"); card.className="gallery-card";
-      card.innerHTML=`
+      const card = document.createElement("div"); card.className = "gallery-card";
+      card.innerHTML = `
         <img src="${meme.imageUrl}" alt="Meme" loading="lazy">
         <div class="gallery-card-info">
-          <div class="gallery-card-user">@${meme.username||"anon"}${isMine?` <span class="mine-badge">you</span>`:""}</div>
+          <div class="gallery-card-user">@${meme.username || "anon"}${isMine ? ` <span class="mine-badge">you</span>` : ""}</div>
           <div class="gallery-card-date">${timeAgo}</div>
           <div class="gallery-card-actions">
-            <button class="like-btn ${isLiked?"liked":""}" data-id="${meme.id}" data-likes='${JSON.stringify(meme.likes||[])}'>
-              ${isLiked?"❤️":"🤍"} ${meme.likeCount||0}
+            <button class="like-btn ${isLiked ? "liked" : ""}" data-id="${meme.id}" data-likes='${JSON.stringify(meme.likes || [])}'>
+              ${isLiked ? "❤️" : "🤍"} ${meme.likeCount || 0}
             </button>
             <div style="display:flex;gap:8px;align-items:center;">
               <a href="${meme.imageUrl}" download="gt-meme.jpg" style="color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;">⬇</a>
-              ${isMine?`<button class="delete-btn" title="Delete your meme">🗑</button>`:""}
+              ${isMine ? `<button class="delete-btn" title="Delete your meme">🗑</button>` : ""}
             </div>
           </div>
         </div>`;
@@ -605,12 +657,15 @@ async function loadGallery(filter = "all") {
         e.stopPropagation();
         toggleLike(meme.id, JSON.parse(e.currentTarget.dataset.likes), e.currentTarget);
       });
-      const deleteBtn=card.querySelector(".delete-btn");
-      if (deleteBtn) deleteBtn.addEventListener("click", e=>{e.stopPropagation(); openDeleteConfirm(meme.id,meme.imageUrl,card);});
+      const deleteBtn = card.querySelector(".delete-btn");
+      if (deleteBtn) deleteBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        openDeleteConfirm(meme.id, meme.imageUrl, card);
+      });
       grid.appendChild(card);
     });
-  } catch(err) {
-    grid.innerHTML=`<div class="gallery-empty"><p>Couldn't load gallery. Firebase may need setup.</p></div>`;
+  } catch (err) {
+    grid.innerHTML = `<div class="gallery-empty"><p>Couldn't load gallery. Firebase may need setup.</p></div>`;
     console.error(err);
   }
 }
@@ -618,215 +673,237 @@ async function loadGallery(filter = "all") {
 async function toggleLike(memeId, currentLikes, btn) {
   if (!currentUID) return;
   const isLiked = currentLikes.includes(currentUID);
-  const memeRef = doc(db,"memes",memeId);
-  const count = parseInt(btn.textContent.replace(/\D/g,""))||0;
+  const memeRef = doc(db, "memes", memeId);
+  const count = parseInt(btn.textContent.replace(/\D/g, "")) || 0;
   if (isLiked) {
-    await updateDoc(memeRef,{likes:arrayRemove(currentUID),likeCount:increment(-1)});
-    btn.innerHTML=`🤍 ${Math.max(0,count-1)}`; btn.classList.remove("liked");
-    btn.dataset.likes=JSON.stringify(currentLikes.filter(u=>u!==currentUID));
-    const s=await getDoc(doc(db,"memes",memeId)); if(s.exists()) await updateDoc(doc(db,"users",s.data().userId),{totalLikes:increment(-1)});
+    await updateDoc(memeRef, { likes: arrayRemove(currentUID), likeCount: increment(-1) });
+    btn.innerHTML = `🤍 ${Math.max(0, count - 1)}`; btn.classList.remove("liked");
+    btn.dataset.likes = JSON.stringify(currentLikes.filter(u => u !== currentUID));
+    const s = await getDoc(doc(db, "memes", memeId));
+    if (s.exists()) await updateDoc(doc(db, "users", s.data().userId), { totalLikes: increment(-1) });
   } else {
-    await updateDoc(memeRef,{likes:arrayUnion(currentUID),likeCount:increment(1)});
-    btn.innerHTML=`❤️ ${count+1}`; btn.classList.add("liked");
-    btn.dataset.likes=JSON.stringify([...currentLikes,currentUID]);
-    const s=await getDoc(doc(db,"memes",memeId)); if(s.exists()) await updateDoc(doc(db,"users",s.data().userId),{totalLikes:increment(1)});
+    await updateDoc(memeRef, { likes: arrayUnion(currentUID), likeCount: increment(1) });
+    btn.innerHTML = `❤️ ${count + 1}`; btn.classList.add("liked");
+    btn.dataset.likes = JSON.stringify([...currentLikes, currentUID]);
+    const s = await getDoc(doc(db, "memes", memeId));
+    if (s.exists()) await updateDoc(doc(db, "users", s.data().userId), { totalLikes: increment(1) });
   }
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────
 async function loadLeaderboard() {
   const table = document.getElementById("leaderboardTable");
-  table.innerHTML=`<div class="lb-loading">Counting hearts... ❤️</div>`;
+  table.innerHTML = `<div class="lb-loading">Counting hearts... ❤️</div>`;
   try {
-    const q=query(collection(db,"users"),orderBy("totalLikes","desc"),limit(15));
-    const snap=await getDocs(q);
-    if(snap.empty){table.innerHTML=`<div class="lb-loading">No data yet — post a meme and get liked!</div>`;return;}
-    table.innerHTML="";
-    const medals=["🥇","🥈","🥉"];
-    snap.docs.forEach((d,i)=>{
-      const u=d.data(); const isMe=d.id===currentUID;
-      const row=document.createElement("div"); row.className=`lb-row${isMe?" is-me":""}`;
-      row.innerHTML=`
-        <div class="lb-rank">${medals[i]||i+1}</div>
+    const q = query(collection(db, "users"), orderBy("totalLikes", "desc"), limit(15));
+    const snap = await getDocs(q);
+    if (snap.empty) { table.innerHTML = `<div class="lb-loading">No data yet — post a meme and get liked!</div>`; return; }
+    table.innerHTML = "";
+    const medals = ["🥇","🥈","🥉"];
+    snap.docs.forEach((d, i) => {
+      const u = d.data(); const isMe = d.id === currentUID;
+      const row = document.createElement("div"); row.className = `lb-row${isMe ? " is-me" : ""}`;
+      row.innerHTML = `
+        <div class="lb-rank">${medals[i] || i + 1}</div>
         <div>
-          <div class="lb-name ${isMe?"lb-name-you":""}">@${u.username||"anon"}${isMe?" (you)":""}</div>
-          <div class="lb-sub">${u.memeCount||0} memes posted</div>
+          <div class="lb-name ${isMe ? "lb-name-you" : ""}">@${u.username || "anon"}${isMe ? " (you)" : ""}</div>
+          <div class="lb-sub">${u.memeCount || 0} memes posted</div>
         </div>
-        <div class="lb-score">${u.totalLikes||0} ❤️</div>`;
+        <div class="lb-score">${u.totalLikes || 0} ❤️</div>`;
       table.appendChild(row);
     });
-  } catch(err){
-    table.innerHTML=`<div class="lb-loading">Couldn't load leaderboard — Firebase setup needed.</div>`;
+  } catch (err) {
+    table.innerHTML = `<div class="lb-loading">Couldn't load leaderboard — Firebase setup needed.</div>`;
     console.error(err);
   }
 }
 
 // ─── PAGE NAV ─────────────────────────────────────────────
 window.showPage = function(name) {
-  document.querySelectorAll(".page").forEach(p=>{p.classList.remove("active");p.classList.add("hidden");});
-  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
-  const page=document.getElementById("page-"+name);
-  const btn=document.querySelector(`[data-page="${name}"]`);
-  if(page){page.classList.remove("hidden");page.classList.add("active");}
-  if(btn) btn.classList.add("active");
-  if(name==="gallery")     loadGallery(state.currentFilter);
-  if(name==="leaderboard") loadLeaderboard();
+  document.querySelectorAll(".page").forEach(p => { p.classList.remove("active"); p.classList.add("hidden"); });
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const page = document.getElementById("page-" + name);
+  const btn  = document.querySelector(`[data-page="${name}"]`);
+  if (page) { page.classList.remove("hidden"); page.classList.add("active"); }
+  if (btn)  btn.classList.add("active");
+  if (name === "gallery")     loadGallery(state.currentFilter);
+  if (name === "leaderboard") loadLeaderboard();
 };
-document.querySelectorAll(".nav-btn").forEach(btn=>{btn.addEventListener("click",()=>showPage(btn.dataset.page));});
-document.querySelectorAll(".filter-btn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active"); state.currentFilter=btn.dataset.filter; loadGallery(state.currentFilter);
+
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => showPage(btn.dataset.page));
+});
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.currentFilter = btn.dataset.filter;
+    loadGallery(state.currentFilter);
   });
 });
 
 // ─── DOWNLOAD / COPY / SHARE ──────────────────────────────
-function hideHandles() { if(handleLayer) handleLayer.style.display="none"; }
-function showHandles() { if(handleLayer) handleLayer.style.display=""; }
-
-document.getElementById("downloadBtn").addEventListener("click",()=>{
+document.getElementById("downloadBtn").addEventListener("click", () => {
   hideHandles();
-  const a=document.createElement("a"); a.download="givingtuesday-meme.png"; a.href=canvas.toDataURL("image/png"); a.click();
+  const a = document.createElement("a"); a.download = "givingtuesday-meme.png";
+  a.href = canvas.toDataURL("image/png"); a.click();
   showHandles(); showToast("⬇ Downloading!");
 });
-document.getElementById("copyBtn").addEventListener("click",async()=>{
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
   hideHandles();
   try {
-    canvas.toBlob(async blob=>{
-      await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
+    canvas.toBlob(async blob => {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       showHandles(); showToast("📋 Copied to clipboard!");
     });
   } catch { showHandles(); showToast("⬇ Use download instead!"); }
 });
-document.getElementById("twitterBtn").addEventListener("click",()=>{
-  const t=encodeURIComponent((state.hashtag||"#GivingTuesday")+" — "+(state.textLayers[0]?.text||""));
-  window.open(`https://twitter.com/intent/tweet?text=${t}&url=https://www.givingtuesday.org`,"_blank");
+
+document.getElementById("twitterBtn").addEventListener("click", () => {
+  const t = encodeURIComponent((state.hashtag || "#GivingTuesday") + " — " + (state.textLayers[0]?.text || ""));
+  window.open(`https://twitter.com/intent/tweet?text=${t}&url=https://www.givingtuesday.org`, "_blank");
 });
-document.getElementById("facebookBtn").addEventListener("click",()=>{
-  window.open("https://www.facebook.com/sharer/sharer.php?u=https://www.givingtuesday.org","_blank");
+document.getElementById("facebookBtn").addEventListener("click", () => {
+  window.open("https://www.facebook.com/sharer/sharer.php?u=https://www.givingtuesday.org", "_blank");
 });
-document.getElementById("igBtn").addEventListener("click",()=>{
+document.getElementById("igBtn").addEventListener("click", () => {
   hideHandles();
-  const a=document.createElement("a"); a.download="gt-meme-ig.png"; a.href=canvas.toDataURL("image/png"); a.click();
+  const a = document.createElement("a"); a.download = "gt-meme-ig.png";
+  a.href = canvas.toDataURL("image/png"); a.click();
   showHandles(); showToast("📸 Saved! Upload to Instagram");
 });
 
 // ─── CONTROL BINDINGS ─────────────────────────────────────
-document.getElementById("imgInput").addEventListener("change",e=>{
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{const img=new Image();img.onload=()=>{state.image=img;drawMeme();};img.src=ev.target.result;};
+document.getElementById("imgInput").addEventListener("change", e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => { state.image = img; drawMeme(); };
+    img.src = ev.target.result;
+  };
   reader.readAsDataURL(file);
-  document.querySelectorAll(".tpl-thumb").forEach(e=>e.classList.remove("active"));
+  document.querySelectorAll(".tpl-thumb").forEach(e => e.classList.remove("active"));
 });
 
-const uploadZone=document.getElementById("uploadZone");
-uploadZone.addEventListener("dragover",e=>{e.preventDefault();uploadZone.classList.add("dragover");});
-uploadZone.addEventListener("dragleave",()=>uploadZone.classList.remove("dragover"));
-uploadZone.addEventListener("drop",e=>{
+const uploadZone = document.getElementById("uploadZone");
+uploadZone.addEventListener("dragover",  e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+uploadZone.addEventListener("drop", e => {
   e.preventDefault(); uploadZone.classList.remove("dragover");
-  const file=e.dataTransfer.files[0]; if(!file?.type.startsWith("image/")) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{const img=new Image();img.onload=()=>{state.image=img;drawMeme();};img.src=ev.target.result;};
+  const file = e.dataTransfer.files[0]; if (!file?.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => { state.image = img; drawMeme(); };
+    img.src = ev.target.result;
+  };
   reader.readAsDataURL(file);
 });
 
-document.getElementById("addTextBtn").addEventListener("click",()=>{
-  const offset=state.textLayers.length*0.1;
-  state.textLayers.push({text:"",x:0.5,y:Math.min(0.9,0.5+offset),fontSize:42,color:"#ffffff"});
+document.getElementById("addTextBtn").addEventListener("click", () => {
+  const offset = state.textLayers.length * 0.1;
+  state.textLayers.push({ text: "", x: 0.5, y: Math.min(0.9, 0.5 + offset), fontSize: 42, color: "#ffffff" });
   buildTextLayerUI();
-  selectLayer(state.textLayers.length-1);
+  selectLayer(state.textLayers.length - 1);
   drawMeme();
 });
 
-document.getElementById("activeFontFamily").addEventListener("change",e=>{state.activeFontFamily=e.target.value;drawMeme();});
+document.getElementById("activeFontFamily").addEventListener("change", e => {
+  state.activeFontFamily = e.target.value; drawMeme();
+});
 
-document.getElementById("activeFontSize").addEventListener("input",e=>{
-  const size=+e.target.value;
-  document.getElementById("fontSizeVal").textContent=size;
-  if(state.textLayers[state.activeLayerIndex]) state.textLayers[state.activeLayerIndex].fontSize=size;
+document.getElementById("activeFontSize").addEventListener("input", e => {
+  const size = +e.target.value;
+  document.getElementById("fontSizeVal").textContent = size;
+  if (state.textLayers[state.activeLayerIndex]) {
+    state.textLayers[state.activeLayerIndex].fontSize = size;
+  }
   drawMeme();
 });
 
-document.getElementById("activeOutline").addEventListener("input",e=>{
-  state.activeOutline=e.target.value; document.getElementById("outlineVal").textContent=e.target.value; drawMeme();
+document.getElementById("activeOutline").addEventListener("input", e => {
+  state.activeOutline = e.target.value;
+  document.getElementById("outlineVal").textContent = e.target.value;
+  drawMeme();
 });
 
-document.querySelectorAll("[data-tc]").forEach(el=>{
-  el.addEventListener("click",()=>{
-    document.querySelectorAll("[data-tc]").forEach(e=>e.classList.remove("active"));
-    el.classList.add("active"); state.activeTextColor=el.dataset.tc;
-    if(state.textLayers[state.activeLayerIndex]) state.textLayers[state.activeLayerIndex].color=el.dataset.tc;
+document.querySelectorAll("[data-tc]").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll("[data-tc]").forEach(e => e.classList.remove("active"));
+    el.classList.add("active");
+    if (state.textLayers[state.activeLayerIndex]) state.textLayers[state.activeLayerIndex].color = el.dataset.tc;
     drawMeme();
   });
 });
-document.getElementById("customTextColor").addEventListener("input",e=>{
-  state.activeTextColor=e.target.value;
-  if(state.textLayers[state.activeLayerIndex]) state.textLayers[state.activeLayerIndex].color=e.target.value;
+document.getElementById("customTextColor").addEventListener("input", e => {
+  if (state.textLayers[state.activeLayerIndex]) state.textLayers[state.activeLayerIndex].color = e.target.value;
   drawMeme();
 });
-document.querySelectorAll("[data-oc]").forEach(el=>{
-  el.addEventListener("click",()=>{
-    document.querySelectorAll("[data-oc]").forEach(e=>e.classList.remove("active"));
-    el.classList.add("active"); state.activeOutlineColor=el.dataset.oc; drawMeme();
+document.querySelectorAll("[data-oc]").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll("[data-oc]").forEach(e => e.classList.remove("active"));
+    el.classList.add("active"); state.activeOutlineColor = el.dataset.oc; drawMeme();
   });
 });
-document.querySelectorAll(".anim-opt").forEach(el=>{
-  el.addEventListener("click",()=>{
-    document.querySelectorAll(".anim-opt").forEach(e=>e.classList.remove("active"));
-    el.classList.add("active"); state.textAnimation=el.dataset.anim; drawMeme();
+document.querySelectorAll(".anim-opt").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".anim-opt").forEach(e => e.classList.remove("active"));
+    el.classList.add("active"); state.textAnimation = el.dataset.anim; drawMeme();
   });
 });
-document.querySelectorAll(".overlay-opt").forEach(el=>{
-  el.addEventListener("click",()=>{
-    document.querySelectorAll(".overlay-opt").forEach(e=>e.classList.remove("active"));
-    el.classList.add("active"); state.overlay=el.dataset.ov; drawMeme();
+document.querySelectorAll(".overlay-opt").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".overlay-opt").forEach(e => e.classList.remove("active"));
+    el.classList.add("active"); state.overlay = el.dataset.ov; drawMeme();
   });
 });
-document.getElementById("hashtagInput").addEventListener("input",e=>{state.hashtag=e.target.value;drawMeme();});
-document.getElementById("clearStickersBtn").addEventListener("click",()=>{stickerLayer.innerHTML="";showToast("Stickers cleared 🧹");});
+document.getElementById("hashtagInput").addEventListener("input", e => { state.hashtag = e.target.value; drawMeme(); });
+document.getElementById("clearStickersBtn").addEventListener("click", () => { stickerLayer.innerHTML = ""; showToast("Stickers cleared 🧹"); });
 
 // ─── HELPERS ──────────────────────────────────────────────
 function formatTime(date) {
-  const diff=Math.floor((Date.now()-date)/1000);
-  if(diff<60) return "just now";
-  if(diff<3600) return Math.floor(diff/60)+"m ago";
-  if(diff<86400) return Math.floor(diff/3600)+"h ago";
-  return Math.floor(diff/86400)+"d ago";
+  const diff = Math.floor((Date.now() - date) / 1000);
+  if (diff < 60)    return "just now";
+  if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  return Math.floor(diff / 86400) + "d ago";
 }
+
 function showToast(msg) {
-  const t=document.getElementById("toast");
-  t.textContent=msg; t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),2800);
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2800);
 }
 
 // ─── DELETE MEME ──────────────────────────────────────────
 function openDeleteConfirm(memeId, imageUrl, card) {
-  const existing=card.querySelector(".delete-confirm");
-  if(existing){existing.remove();return;}
-  const banner=document.createElement("div"); banner.className="delete-confirm";
-  banner.innerHTML=`
+  const existing = card.querySelector(".delete-confirm");
+  if (existing) { existing.remove(); return; }
+  const banner = document.createElement("div"); banner.className = "delete-confirm";
+  banner.innerHTML = `
     <span>Delete this meme?</span>
     <button class="delete-confirm-yes">Yes, nuke it 💀</button>
     <button class="delete-confirm-no">Cancel</button>`;
-  banner.querySelector(".delete-confirm-yes").addEventListener("click",()=>deleteMeme(memeId,imageUrl,card));
-  banner.querySelector(".delete-confirm-no").addEventListener("click",()=>banner.remove());
+  banner.querySelector(".delete-confirm-yes").addEventListener("click", () => deleteMeme(memeId, imageUrl, card));
+  banner.querySelector(".delete-confirm-no").addEventListener("click", () => banner.remove());
   card.appendChild(banner);
 }
 
 async function deleteMeme(memeId, imageUrl, card) {
   try {
-    await deleteDoc(doc(db,"memes",memeId));
+    await deleteDoc(doc(db, "memes", memeId));
     try {
-      const path=decodeURIComponent(new URL(imageUrl).pathname.split("/o/")[1].split("?")[0]);
-      await deleteObject(ref(storage,path));
-    } catch(e){console.warn("Storage delete skipped:",e.message);}
-    await updateDoc(doc(db,"users",currentUID),{memeCount:increment(-1)});
-    card.style.transition="all 0.3s ease";
-    card.style.opacity="0"; card.style.transform="scale(0.9)";
-    setTimeout(()=>card.remove(),300);
+      const path = decodeURIComponent(new URL(imageUrl).pathname.split("/o/")[1].split("?")[0]);
+      await deleteObject(ref(storage, path));
+    } catch (e) { console.warn("Storage delete skipped:", e.message); }
+    await updateDoc(doc(db, "users", currentUID), { memeCount: increment(-1) });
+    card.style.transition = "all 0.3s ease";
+    card.style.opacity = "0"; card.style.transform = "scale(0.9)";
+    setTimeout(() => card.remove(), 300);
     showToast("🗑 Meme deleted.");
-  } catch(err){console.error(err); showToast("Delete failed — check Firebase rules.");}
+  } catch (err) { console.error(err); showToast("Delete failed — check Firebase rules."); }
 }
 
 // ─── INIT ─────────────────────────────────────────────────
