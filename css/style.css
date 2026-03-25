@@ -344,9 +344,13 @@ input[type="color"] { width: 26px; height: 26px; border-radius: 50%; border: non
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden; position: relative;
 }
-.canvas-wrap { position: relative; overflow: hidden; background: #111; }
-canvas { display: block; width: 100%; height: auto; }
-.sticker-layer { position: absolute; inset: 0; pointer-events: none; }
+.canvas-wrap canvas {
+  display: block; width: 100%; height: auto;
+  position: relative; z-index: 1;
+}
+
+.sticker-layer  { z-index: 2; }
+.anim-text-layer { z-index: 3; }
 .sticker-el {
   position: absolute; font-size: 36px; cursor: grab;
   user-select: none; pointer-events: all; line-height: 1;
@@ -488,7 +492,7 @@ canvas { display: block; width: 100%; height: auto; }
 /* ─── TEXT DRAG / RESIZE HANDLES ────────────────── */
 .handle-layer {
   position: absolute; inset: 0;
-  pointer-events: none;
+  pointer-events: none;  /* ← keep this, children override it */
   z-index: 20;
 }
 
