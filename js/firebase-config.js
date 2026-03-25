@@ -12,13 +12,25 @@ import { getStorage }    from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 
 // 🔴 REPLACE THIS WITH YOUR FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+
+  apiKey: "AIzaSyC79OBJtEyhtkJOv51EpHQ-S_H9_yKaTd0",
+
+  authDomain: "gtmemelab.firebaseapp.com",
+
+  databaseURL: "https://gtmemelab-default-rtdb.firebaseio.com",
+
+  projectId: "gtmemelab",
+
+  storageBucket: "gtmemelab.firebasestorage.app",
+
+  messagingSenderId: "521283918026",
+
+  appId: "1:521283918026:web:7bf936e961df88721b7c33",
+
+  measurementId: "G-H2MN8TGP1F"
+
 };
+
 
 const app = initializeApp(firebaseConfig);
 export const auth    = getAuth(app);
