@@ -10,10 +10,10 @@ import {
 import {
   collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc,
   arrayUnion, arrayRemove, query, orderBy, limit,
-  serverTimestamp, increment
+  serverTimestamp, increment, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  ref, uploadString, getDownloadURL
+  ref, uploadString, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 // ─── RANDOM NAME GENERATOR ────────────────────────────────
@@ -487,7 +487,10 @@ async function loadGallery(filter = "all") {
             <button class="like-btn ${isLiked?"liked":""}" data-id="${meme.id}" data-likes='${JSON.stringify(meme.likes||[])}'>
               ${isLiked?"❤️":"🤍"} ${meme.likeCount||0}
             </button>
-            <a href="${meme.imageUrl}" download="gt-meme.jpg" style="color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;">⬇</a>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <a href="${meme.imageUrl}" download="gt-meme.jpg" style="color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;">⬇</a>
+              ${isMine ? `<button class="delete-btn" title="Delete your meme">🗑</button>` : ""}
+            </div>
           </div>
         </div>
       `;
@@ -496,6 +499,13 @@ async function loadGallery(filter = "all") {
         const btn = e.currentTarget;
         toggleLike(meme.id, JSON.parse(btn.dataset.likes), btn);
       });
+      const deleteBtn = card.querySelector(".delete-btn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          openDeleteConfirm(meme.id, meme.imageUrl, card);
+        });
+      }
       grid.appendChild(card);
     });
   } catch(err) {
@@ -690,6 +700,46 @@ function showToast(msg) {
   const t=document.getElementById("toast");
   t.textContent=msg; t.classList.add("show");
   setTimeout(()=>t.classList.remove("show"),2800);
+}
+
+// ─── DELETE MEME ──────────────────────────────────────────
+function openDeleteConfirm(memeId, imageUrl, card) {
+  const existing = card.querySelector(".delete-confirm");
+  if (existing) { existing.remove(); return; }
+
+  const banner = document.createElement("div");
+  banner.className = "delete-confirm";
+  banner.innerHTML = `
+    <span>Delete this meme?</span>
+    <button class="delete-confirm-yes">Yes, nuke it 💀</button>
+    <button class="delete-confirm-no">Cancel</button>
+  `;
+  banner.querySelector(".delete-confirm-yes").addEventListener("click", () => deleteMeme(memeId, imageUrl, card));
+  banner.querySelector(".delete-confirm-no").addEventListener("click", () => banner.remove());
+  card.appendChild(banner);
+}
+
+async function deleteMeme(memeId, imageUrl, card) {
+  try {
+    await deleteDoc(doc(db, "memes", memeId));
+
+    // Delete from Storage (best effort)
+    try {
+      const path = decodeURIComponent(new URL(imageUrl).pathname.split("/o/")[1].split("?")[0]);
+      await deleteObject(ref(storage, path));
+    } catch (e) { console.warn("Storage delete skipped:", e.message); }
+
+    await updateDoc(doc(db, "users", currentUID), { memeCount: increment(-1) });
+
+    card.style.transition = "all 0.3s ease";
+    card.style.opacity = "0";
+    card.style.transform = "scale(0.9)";
+    setTimeout(() => card.remove(), 300);
+    showToast("🗑 Meme deleted.");
+  } catch (err) {
+    console.error(err);
+    showToast("Delete failed — check Firebase rules.");
+  }
 }
 
 // ─── INIT ─────────────────────────────────────────────────
